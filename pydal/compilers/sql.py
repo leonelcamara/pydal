@@ -813,8 +813,14 @@ class SQLCompiler:
             rendered = self.visit(r)
             if escape is None:
                 escape = "\\"
-        left = ("LOWER(%s)" % self.visit(l)) if lowered_left else self.visit(l)
+        left = self._render_like_left(l, lowered_left)
         return "(%s LIKE %s ESCAPE '%s')" % (left, rendered, escape)
+
+    def _render_like_left(self, l: ast.Node, lowered_left: bool) -> str:
+        """Render the left-hand operand of a LIKE. Subclasses override to
+        inject backend-specific casts (e.g. Postgres ``::text``)."""
+        rendered = self.visit(l)
+        return ("LOWER(%s)" % rendered) if lowered_left else rendered
 
     def op_like(self, l, r, opts):
         """Render ``(left LIKE right ESCAPE '...')`` — case-sensitive match."""

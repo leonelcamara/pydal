@@ -424,9 +424,7 @@ class PostgresDialect(SQLDialect):
                 second = second.replace(escape, escape * 2)
         if first.type not in ("string", "text", "json", "jsonb"):
             return "(%s LIKE %s ESCAPE '%s')" % (
-                self.cast(
-                    self.expand(first, query_env=query_env), "CHAR(%s)" % first.length
-                ),
+                self.expand(first, query_env=query_env) + "::text",
                 second,
                 escape,
             )

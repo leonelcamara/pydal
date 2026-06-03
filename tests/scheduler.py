@@ -4,6 +4,7 @@
 """Unit tests for scheduler.py"""
 
 import datetime
+import sys
 import tempfile
 import time
 
@@ -14,6 +15,7 @@ from ._compat import unittest
 
 
 class TestScheduler(unittest.TestCase):
+    @unittest.skipIf(sys.platform == "win32", "signal.SIGCHLD is not available on Windows")
     def test_scheduler(self):
         completed_tasks = []
 
