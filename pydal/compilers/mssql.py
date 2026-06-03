@@ -40,6 +40,42 @@ class MSSQLCompiler(SQLCompiler):
         # (which may already contain " DISTINCT").
         return dst + " TOP %i" % lmax, "", ""
 
+    # MSSQL has no EXTRACT/LENGTH; mirror the legacy MSSQLDialect.
+    def fn_extract(self, args, opts):
+        """Render ``DATEPART(<unit>, arg)`` — MSSQL has no ``EXTRACT``."""
+        return "DATEPART(%s,%s)" % (opts.get("unit", ""), self.visit(args[0]))
+
+    def un_epoch(self, x, _):
+        """Render epoch via ``DATEDIFF(second, '1970-01-01 00:00:00', ...)``."""
+        return "DATEDIFF(second, '1970-01-01 00:00:00', %s)" % self.visit(x)
+
+    def un_length(self, x, _):
+        """Render ``LEN(operand)`` — MSSQL spells ``LENGTH`` as ``LEN``."""
+        return "LEN(%s)" % self.visit(x)
+
+    def fn_aggregate(self, args, opts):
+        """Render ``KIND(arg)``, mapping ``LENGTH`` to MSSQL's ``LEN``."""
+        kind = opts.get("kind", "")
+        if kind == "LENGTH":
+            kind = "LEN"
+        return "%s(%s)" % (kind, self.visit(args[0]))
+
+    def op_add(self, l, r, opts):
+        """String concatenation uses ``+`` in MSSQL (numeric stays ``+``)."""
+        return "(%s + %s)" % (self.visit(l), self.visit(r))
+
+    def fn_cast(self, args, _):
+        """MSSQL needs no explicit cast — emit the operand unchanged."""
+        return self.visit(args[0])
+
+    def fn_substring(self, args, _):
+        """Render ``SUBSTRING(field, pos, length)`` (MSSQL spelling)."""
+        return "SUBSTRING(%s,%s,%s)" % (
+            self.visit(args[0]),
+            self.visit(args[1]),
+            self.visit(args[2]),
+        )
+
 
 @compilers.register_for(MSSQL3)
 @compilers.register_for(MSSQL3N)
