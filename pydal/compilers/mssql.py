@@ -93,6 +93,17 @@ class MSSQLCompiler(SQLCompiler):
             return "N" + rendered[1:]
         return rendered
 
+    def _render_update(self, n, table, sets, whr):
+        """MSSQL aliased UPDATE names the alias in the leading clause and
+        the full ref in a trailing FROM: ``UPDATE alias SET ... FROM ref``."""
+        return "UPDATE %s SET %s FROM %s%s;" % (
+            n.sqlshortref or table, sets, table, whr,
+        )
+
+    def _render_delete(self, n, table, whr):
+        """MSSQL aliased DELETE: ``DELETE alias FROM ref WHERE ...``."""
+        return "DELETE %s FROM %s%s;" % (n.sqlshortref or table, table, whr)
+
 
 @compilers.register_for(MSSQL3)
 @compilers.register_for(MSSQL3N)

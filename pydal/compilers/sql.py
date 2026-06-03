@@ -416,11 +416,16 @@ class SQLCompiler:
                 for col, val in n.sets
             )
             whr = " WHERE %s" % self.visit(n.where) if n.where is not None else ""
-            sql = "UPDATE %s SET %s%s;" % (table, sets, whr)
+            sql = self._render_update(n, table, sets, whr)
         finally:
             self._scope_stack.pop()
             self._ctx = None
         return ParamSQL(sql, ctx.params) if ctx is not None else sql
+
+    def _render_update(self, n: ast.Update, table: str, sets: str, whr: str) -> str:
+        """Assemble the final UPDATE statement. Subclasses override to emit
+        backend-specific shapes (e.g. MSSQL's ``UPDATE alias SET ... FROM table``)."""
+        return "UPDATE %s SET %s%s;" % (table, sets, whr)
 
     def compile_delete(self, n: ast.Delete):
         """Compile a ``Delete`` AST node into ``DELETE FROM ... WHERE ...;`` SQL."""
@@ -429,11 +434,16 @@ class SQLCompiler:
         try:
             table = n.sqlsafe if n.sqlsafe is not None else self._writing_alias(n.table)
             whr = " WHERE %s" % self.visit(n.where) if n.where is not None else ""
-            sql = "DELETE FROM %s%s;" % (table, whr)
+            sql = self._render_delete(n, table, whr)
         finally:
             self._scope_stack.pop()
             self._ctx = None
         return ParamSQL(sql, ctx.params) if ctx is not None else sql
+
+    def _render_delete(self, n: ast.Delete, table: str, whr: str) -> str:
+        """Assemble the final DELETE statement. Subclasses override to emit
+        backend-specific shapes (e.g. MSSQL's ``DELETE alias FROM table``)."""
+        return "DELETE FROM %s%s;" % (table, whr)
 
     def compile_count(self, n: ast.Count):
         """Compile a Count node into ``SELECT COUNT(...) FROM ...;``."""
