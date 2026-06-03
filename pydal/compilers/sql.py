@@ -802,17 +802,12 @@ class SQLCompiler:
         or a non-Literal expression (rendered as-is). For ILIKE we also
         lowercase the rendered second string and wrap the first in LOWER.
         """
-        if isinstance(r, ast.Literal):
-            rendered = self._represent(r.value, r.type or "string")
-            if lowered_left:
-                rendered = str(rendered).lower()
-            if escape is None:
-                escape = "\\"
-                rendered = str(rendered).replace(escape, escape * 2)
-        else:
-            rendered = self.visit(r)
-            if escape is None:
-                escape = "\\"
+        # When no explicit escape char is given, default to backslash and
+        # (for literals) double any backslash in the pattern itself.
+        double = escape is None
+        if escape is None:
+            escape = "\\"
+        rendered = self._render_like_right(r, lowered_left, escape if double else None)
         left = self._render_like_left(l, lowered_left)
         return "(%s LIKE %s ESCAPE '%s')" % (left, rendered, escape)
 
@@ -821,6 +816,23 @@ class SQLCompiler:
         inject backend-specific casts (e.g. Postgres ``::text``)."""
         rendered = self.visit(l)
         return ("LOWER(%s)" % rendered) if lowered_left else rendered
+
+    def _render_like_right(self, r: ast.Node, lowered_left: bool, escape_to_double):
+        """Render the right-hand operand (pattern) of a LIKE. Subclasses
+        override to fix up backend-specific quirks (e.g. MSSQL restores the
+        uppercase ``N`` prefix that ILIKE lowercasing would corrupt).
+
+        ``escape_to_double`` is the escape char whose occurrences must be
+        doubled in a *literal* pattern (``None`` when an explicit ESCAPE was
+        supplied, so the pattern is taken verbatim)."""
+        if isinstance(r, ast.Literal):
+            rendered = str(self._represent(r.value, r.type or "string"))
+            if lowered_left:
+                rendered = rendered.lower()
+            if escape_to_double is not None:
+                rendered = rendered.replace(escape_to_double, escape_to_double * 2)
+            return rendered
+        return self.visit(r)
 
     def op_like(self, l, r, opts):
         """Render ``(left LIKE right ESCAPE '...')`` — case-sensitive match."""

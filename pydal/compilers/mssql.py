@@ -83,6 +83,16 @@ class MSSQLCompiler(SQLCompiler):
             self.visit(args[2]),
         )
 
+    def _render_like_right(self, r, lowered_left, escape_to_double):
+        """Restore the uppercase national-string prefix that ILIKE
+        lowercasing corrupts: MSSQLN represents strings as ``N'...'`` but
+        ILIKE lowercases the whole literal to ``n'...'``, which T-SQL
+        rejects. No-op for non-N MSSQL (literals start with ``'``)."""
+        rendered = super()._render_like_right(r, lowered_left, escape_to_double)
+        if rendered.startswith("n'"):
+            return "N" + rendered[1:]
+        return rendered
+
 
 @compilers.register_for(MSSQL3)
 @compilers.register_for(MSSQL3N)
