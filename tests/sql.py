@@ -565,6 +565,21 @@ class TestSelect(DALtest):
         db.tt.insert(aa=l)
         self.assertEqual(db(db.tt).select("tt.aa").first()[db.tt.aa], l)
 
+    def testListStringSpecialChars(self):
+        """list:string elements with commas, quotes, braces, backslashes survive a round-trip."""
+        db = self.connect()
+        db.define_table("tt", Field("aa", "list:string"))
+        tricky = [
+            "comma, separated",
+            'double"quote',
+            "{brace}",
+            "back\\slash",
+            "it's a quote",
+            "NULL",
+        ]
+        db.tt.insert(aa=tricky)
+        self.assertEqual(db(db.tt).select(db.tt.aa).first()[db.tt.aa], tricky)
+
     def testListReference(self):
         db = self.connect()
         db.define_table("t0", Field("aa", "string"))

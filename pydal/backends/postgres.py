@@ -848,6 +848,17 @@ class PostgresArraysRepresenter(PostgresRepresenter):
     """
 
     def _listify_elements(self, elements):
-        """Render a Python sequence as a Postgres array literal ``{a,b,c}``."""
-        return "{" + ",".join(str(el) for el in elements) + "}"
+        """Render a Python sequence as a properly-quoted Postgres array literal.
+
+        Each element is double-quoted and any backslashes or double-quotes
+        inside the value are escaped, so that elements containing commas,
+        braces, backslashes, or quotes do not produce a malformed literal.
+        """
+
+        def _quote(el):
+            s = str(el)
+            s = s.replace("\\", "\\\\").replace('"', '\\"')
+            return '"' + s + '"'
+
+        return "{" + ",".join(_quote(el) for el in elements) + "}"
 
