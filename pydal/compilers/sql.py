@@ -209,6 +209,21 @@ class SQLCompiler:
             self._ctx = None
         return ParamSQL(sql, ctx.params) if ctx is not None else sql
 
+    def _emit_limitby(self, n: ast.Select, dst: str):
+        """Return ``(dst, limit_clause, offset_clause)`` for the limit/offset part.
+
+        The default emits ANSI ``LIMIT N OFFSET M``. Subclasses override
+        this to emit backend-specific syntax (e.g. ``SELECT TOP N`` for MSSQL)
+        by modifying ``dst`` and/or returning non-empty limit/offset strings.
+        Raise ``NotImplementedError`` to fall back to the legacy dialect path.
+        """
+        limit = offset = ""
+        if n.limit:
+            lmin, lmax = n.limit
+            limit = " LIMIT %i" % (lmax - lmin)
+            offset = " OFFSET %i" % lmin
+        return dst, limit, offset
+
     def _compile_select_body(self, n: ast.Select) -> str:
         # IMPORTANT: visits happen in SQL-position order. Positional ``?``
         # placeholders bind to params in the order they appear in the
@@ -299,12 +314,9 @@ class SQLCompiler:
             order = ""
             if n.orderby:
                 order = " ORDER BY %s" % ", ".join(self.visit(o) for o in n.orderby)
-            # LIMIT / OFFSET (always inline)
-            limit = offset = ""
-            if n.limit:
-                lmin, lmax = n.limit
-                limit = " LIMIT %i" % (lmax - lmin)
-                offset = " OFFSET %i" % lmin
+            # LIMIT / OFFSET — delegated to _emit_limitby so subclasses
+            # (e.g. MSSQLCompiler) can replace ANSI LIMIT with TOP/FETCH.
+            dst, limit, offset = self._emit_limitby(n, dst)
             # FOR UPDATE
             upd = " FOR UPDATE" if n.for_update else ""
             return "%sSELECT%s %s FROM %s%s%s%s%s%s%s%s;" % (
